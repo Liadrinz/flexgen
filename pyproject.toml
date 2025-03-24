@@ -1,16 +1,12 @@
 [project]
 name = "FlexyGen"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
   { name="Yuang Cai", email="cyang.bupt@foxmail.com" },
 ]
 description = "An easy-to-use LLM controllable generation tool"
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = [
-  "torch",
-  "transformers>=4.41.0"
-]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
