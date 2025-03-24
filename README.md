@@ -1,5 +1,7 @@
 # FlexGen
 
+English | [中文版](README-zh.md)
+
 FlexGen is an easy-to-use **LLM controllable generation tool** that controls and adjusts model generation content by injecting **triggers** and **invocations** into the model.
 
 ## Getting Started
