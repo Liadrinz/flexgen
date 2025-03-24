@@ -1,8 +1,8 @@
-# FlexGen
+# FlexyGen
 
 中文版 | [English](README.md)
 
-FlexGen是一款易用的**LLM可控生成工具**，通过向模型中注入**触发器**和**外部调用**实现对模型生成内容的控制和调整。
+FlexyGen是一款易用的**LLM可控生成工具**，通过向模型中注入**触发器**和**外部调用**实现对模型生成内容的控制和调整。
 
 ## 入门
 
@@ -19,7 +19,7 @@ from transformers import (
     AutoModelForCausalLM,
     BitsAndBytesConfig,
 )
-from flexgen import Insertable
+from flexygen import Insertable
 ```
 
 ### 1. 加载Tokenizer和模型
@@ -32,7 +32,7 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 ```
 
-### 2. 使用FlexGen接口包裹模型
+### 2. 使用FlexyGen接口包裹模型
 
 `Insertable`接口可以在满足一定条件时向正在生成的句子中插入内容。
 

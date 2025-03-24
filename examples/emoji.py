@@ -7,7 +7,7 @@ from transformers import (
     AutoModelForCausalLM,
     BitsAndBytesConfig,
 )
-from flexgen import Insertable
+from flexygen import Insertable
 
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
@@ -21,7 +21,7 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 
-# 2. Wrap the Model with FlexGen Interface
+# 2. Wrap the Model with FlexyGen Interface
 model = Insertable.wrap(model, tokenizer)
 
 

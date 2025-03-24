@@ -1,8 +1,8 @@
-# FlexGen
+# FlexyGen
 
 English | [中文版](README-zh.md)
 
-FlexGen is an easy-to-use **LLM controllable generation tool** that controls and adjusts model generation content by injecting **triggers** and **invocations** into the model.
+FlexyGen is an easy-to-use **LLM controllable generation tool** that controls and adjusts model generation content by injecting **triggers** and **invocations** into the model.
 
 ## Getting Started
 
@@ -19,7 +19,7 @@ from transformers import (
     AutoModelForCausalLM,
     BitsAndBytesConfig,
 )
-from flexgen import Insertable
+from flexygen import Insertable
 ```
 
 ### 1. Load HF Tokenizer and Model
@@ -32,7 +32,7 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 ```
 
-### 2. Wrap the Model with FlexGen Interface
+### 2. Wrap the Model with FlexyGen Interface
 
 The `Insertable` interface can be used to insert content into the sentence being generated when certain conditions are met.
 

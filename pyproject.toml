@@ -1,0 +1,19 @@
+[project]
+name = "FlexyGen"
+version = "0.0.1"
+authors = [
+  { name="Yuang Cai", email="cyang.bupt@foxmail.com" },
+]
+description = "An easy-to-use LLM controllable generation tool"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/Liadrinz/FlexyGen"
+Issues = "https://github.com/Liadrinz/FlexyGen/issues"
