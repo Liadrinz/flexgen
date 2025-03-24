@@ -4,6 +4,12 @@ English | [中文版](README-zh.md)
 
 FlexyGen is an easy-to-use **LLM controllable generation tool** that controls and adjusts model generation content by injecting **triggers** and **invocations** into the model.
 
+## Installation
+
+```shell
+pip install flexygen
+```
+
 ## Getting Started
 
 Demo Code: [examples/emoji.py](examples/emoji.py)
