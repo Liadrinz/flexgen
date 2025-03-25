@@ -2,7 +2,13 @@
 
 中文版 | [English](README.md)
 
-FlexyGen是一款易用的**LLM可控生成工具**，通过向模型中注入**触发器**和**外部调用**实现对模型生成内容的控制和调整。
+FlexyGen是一款易用的**LLM可控生成工具**，通过控制反转（IoC）的思想，允许开发者向模型中注入一系列**触发器**实现对模型生成过程的控制。在触发器中可以根据模型当前的生成状态对生成内容进行修改（目前仅支持在当前生成句子后拼接新的内容）。
+
+## 安装
+
+```shell
+pip install flexygen
+```
 
 ## 入门
 
@@ -13,9 +19,8 @@ FlexyGen是一款易用的**LLM可控生成工具**，通过向模型中注入**
 ```python
 import random
 
-from typing import List
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from flexygen import Insertable
+from flexygen import FlexyGen, GenerationState
 ```
 
 ### 1. 加载Tokenizer和模型
@@ -27,38 +32,25 @@ model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
 
 ### 2. 使用FlexyGen接口包裹模型
 
-`Insertable`接口可以在满足一定条件时向正在生成的句子中插入内容。
+`FlexyGen`接口可以在满足一定条件时向正在生成的句子中插入内容。
 
 ```python
-model = Insertable.wrap(model, tokenizer)
+model = FlexyGen.wrap(model, tokenizer)
 ```
 
-### 3. 为模型注入触发器
+### 3. 为模型注入拼接触发器
 
-注入名为`emoji`的触发器。
+为模型注入一个名为`emoji`的拼接触发器。
 
-模型生成过程中，每生成一个token都会调用触发器，触发器返回`True`时会触发外部调用。
+模型每生成一个token都将调用该触发器。
 
-这里`input_ids`是模型当前生成的内容。
+如果当前句子以`"，", "。", "！", "？"`结尾，则触发器返回一个随机emoji字符，该字符会被拼接到当前句子的后面，否则返回`None`，且不会改变当前句子。
 
-```python
-@model.trigger("emoji")
-def emoji_trigger(input_ids) -> bool:
-    sentence = tokenizer.batch_decode(input_ids)[0].strip()
-    return sentence.endswith(("，", "。", "！", "？"))
-```
-
-### 4. 为模型注入外部调用
-
-注入名为`emoji`的外部调用。
-
-当同名的触发器返回`True`时，将触发这一调用。
-
-调用返回的字符串会被插入到当前生成的内容后面。（目前仅支持`batch_size=1`）
+`state`中存储着生成状态，可以通过`state.input_ids`访问当前句子。
 
 ```python
-@model.invocation("emoji")
-def generate_random_emoji(input_ids) -> List[str]:
+@model.splicer("emoji")
+def emoji_splicer(state: GenerationState) -> bool:
     def random_emoji():
         ranges = [
             (0x1F600, 0x1F64F),
@@ -69,11 +61,12 @@ def generate_random_emoji(input_ids) -> List[str]:
         start, end = random.choice(ranges)
         code_point = random.randint(start, end)
         return chr(code_point)
-    bsz = input_ids.size(0)
-    return [random_emoji() for _ in range(bsz)]
+    sentence = tokenizer.batch_decode(state.input_ids)[0].strip()
+    if sentence.endswith(("，", "。", "！", "？")):
+        return random_emoji()  # 返回一个随机的emoji表情字符
 ```
 
-### 5. 生成
+### 4. 生成
 
 ```python
 input_text = tokenizer.apply_chat_template([
@@ -84,3 +77,55 @@ outputs = model.generate(**inputs, do_sample=True, max_new_tokens=128)
 # 每句话后面都有一个emoji
 print(tokenizer.batch_decode(outputs)[0])
 ```
+
+## 访问`state`中的其他内容
+
+`state`中除了`state.input_ids`还可以访问其他内容：
+
+- `state.model_kwargs`: 模型参数，包含传给模型的`attention_mask`, `past_key_values`等参数
+- `state.current_length`: 当前句子长度（token数）
+- `state.next_tokens`: 模型当前生成的token，等价于`state.input_ids[:, -1]`
+- `state.next_token_logits`: 当前token的logits
+- `state.next_token_scores`: 当前token的scores（经过logit_processor处理后的logits）
+
+如果在`generate()`方法中指定`return_dict_in_generate=True`和`output_scores=True`，则触发器中可以访问`state.scores`，即所有token的scores。
+
+如果在`generate()`方法中指定`return_dict_in_generate=True`和`output_logits=True`，则触发器中可以访问`state.raw_logits`，即模型的注意力权重。
+
+如果在`generate()`方法中指定`return_dict_in_generate=True`和`output_attentions=True`，则触发器中可以访问`state.decoder_attentions`, `state.cross_attentions`，分别为解码器的注意力权重和交叉注意力权重（仅encoder-decoder架构）
+
+如果在`generate()`方法中指定`return_dict_in_generate=True`和`output_hidden_states=True`，则触发器中可以访问`state.decoder_hidden_states`，表示解码器每个Transformer层输出的隐状态向量。
+
+## 使用`SentenceLevelFlexyGen`
+
+在一些应用中需要根据句子的概率或句子中某些token的概率来触发某些调用，例如自适应**RAG**会判断句子中token的概率来决定是否触发检索。
+
+此时可以使用`SentenceLevelFlexyGen`：
+
+```python
+
+# ...省略模型定义
+
+from flexygen import SentenceLevelFlexyGen, SentenceLevelGenerationState
+
+
+model = SentenceLevelFlexyGen.wrap(model, tokenizer)
+
+
+@model.splicer("prob")
+def prob_trigger(state: SentenceLevelGenerationState):
+    if state.end_of_sentences[0]:
+        if min(state.sentence_token_probs[0]) < 0.1:
+            # 如果句子中token的最小概率小于0.1
+            # 则返回表示不确定的话语
+            return "等等，我不太确定。"
+
+
+# ...省略生成
+```
+
+使用`SentenceLevelFlexyGen`时，触发器中的`state`变为`SentenceLevelGenerationState`对象，比`GenerationState`多了一些内容：
+
+- `state.end_of_sentences: List[bool]`：布尔变量列表，表示一个batch中的每个输出是否生成了一个完整的句子（默认情况下，以`。？！.?!`这六个字符结尾表示生成了一个句子）
+- `state.sentence_tokens: List[List[int]]`：当前句子
+- `state.sentence_token_probs: List[List[int]]`：当前句子中每个token的概率
