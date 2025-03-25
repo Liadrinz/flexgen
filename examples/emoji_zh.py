@@ -1,9 +1,8 @@
 import os
 import random
 
-from typing import List
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from flexygen import Insertable
+from flexygen import FlexyGen, GenerationState
 
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
@@ -15,19 +14,12 @@ model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
 
 
 # 2. 使用FlexyGen接口包裹模型
-model = Insertable.wrap(model, tokenizer)
+model = FlexyGen.wrap(model, tokenizer)
 
 
-# 3. 为模型注入触发器
-@model.trigger("emoji")
-def emoji_trigger(input_ids) -> bool:
-    sentence = tokenizer.batch_decode(input_ids)[0].strip()
-    return sentence.endswith(("，", "。", "！", "？"))
-
-
-# 4. 为模型注入外部调用
-@model.invocation("emoji")
-def generate_random_emoji(input_ids) -> List[str]:
+# 3. 为模型注入连接器
+@model.splicer("emoji")
+def emoji_splicer(state: GenerationState) -> bool:
     def random_emoji():
         ranges = [
             (0x1F600, 0x1F64F),
@@ -38,11 +30,12 @@ def generate_random_emoji(input_ids) -> List[str]:
         start, end = random.choice(ranges)
         code_point = random.randint(start, end)
         return chr(code_point)
-    bsz = input_ids.size(0)
-    return [random_emoji() for _ in range(bsz)]
+    sentence = tokenizer.batch_decode(state.input_ids)[0].strip()
+    if sentence.endswith(("，", "。", "！", "？")):
+        return random_emoji()  # 返回一个随机的emoji表情字符
 
 
-# 5. 生成
+# 4. 生成
 input_text = tokenizer.apply_chat_template([
     {"role": "user", "content": "为什么天空是蓝色的？"},
 ], tokenize=False, add_generation_prompt=True)
