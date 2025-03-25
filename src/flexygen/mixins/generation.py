@@ -33,26 +33,20 @@ from transformers.generation.utils import (
     _speculative_sampling,
 )
 from transformers.generation.streamers import BaseStreamer
+from ..data import GenerationState
 
 
 class GenerationMixinWithPerIterCallbacks(GenerationMixin):
     
+    def _reset_before_generation(self):
+        pass
+    
     def on_each_iteration_end(
         self,
-        input_ids: torch.LongTensor,
-        next_tokens: torch.LongTensor,
-        next_token_logits: torch.FloatTensor,
-        next_token_scores: torch.FloatTensor,
-        cur_len: int,
-        model_kwargs: Dict[str, Any],
-        scores: Tuple[torch.FloatTensor],
-        raw_logits: Tuple[torch.FloatTensor],
-        decoder_attentions: Tuple[torch.FloatTensor],
-        cross_attentions: Tuple[torch.FloatTensor],
-        decoder_hidden_states: Tuple[torch.FloatTensor],
-        streamer: BaseStreamer,
-    ):
-        return input_ids, model_kwargs, cur_len
+        state: GenerationState,
+        streamer: Optional[BaseStreamer] = None,
+    ) -> GenerationState:
+        return state
     
     def _dola_decoding(
         self,
@@ -209,22 +203,21 @@ class GenerationMixinWithPerIterCallbacks(GenerationMixin):
             if streamer is not None:
                 streamer.put(next_tokens.cpu())
 
-            input_ids, model_kwargs, cur_len = (
-                self.on_each_iteration_end(
-                    input_ids,
-                    next_tokens,
-                    next_token_logits,
-                    next_token_scores,
-                    cur_len,
-                    model_kwargs,
-                    scores,
-                    raw_logits,
-                    decoder_attentions,
-                    cross_attentions,
-                    decoder_hidden_states,
-                    streamer,
-                )
+            cur_state = GenerationState(
+                input_ids=input_ids,
+                model_kwargs=model_kwargs,
+                current_length=cur_len,
+                next_tokens=next_tokens,
+                next_token_logits=next_token_logits,
+                next_token_scores=next_token_scores,
+                scores=scores,
+                raw_logits=raw_logits,
+                decoder_attentions=decoder_attentions,
+                cross_attentions=cross_attentions,
+                decoder_hidden_states=decoder_hidden_states,
             )
+            new_state = self.on_each_iteration_end(cur_state, streamer)
+            input_ids, model_kwargs, cur_len = new_state.autoregressive_props()
 
             # stop when each sentence is finished
             unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores)
@@ -572,22 +565,21 @@ class GenerationMixinWithPerIterCallbacks(GenerationMixin):
             if streamer is not None:
                 streamer.put(next_tokens.cpu())
             
-            input_ids, model_kwargs, cur_len = (
-                self.on_each_iteration_end(
-                    input_ids,
-                    next_tokens,
-                    logit_for_next_step,
-                    processed_logit_for_next_step,
-                    cur_len,
-                    model_kwargs,
-                    scores,
-                    raw_logits,
-                    decoder_attentions,
-                    cross_attentions,
-                    decoder_hidden_states,
-                    streamer,
-                )
+            cur_state = GenerationState(
+                input_ids=input_ids,
+                model_kwargs=model_kwargs,
+                current_length=cur_len,
+                next_tokens=next_tokens,
+                next_token_logits=logit_for_next_step,
+                next_token_scores=processed_logit_for_next_step,
+                scores=scores,
+                raw_logits=raw_logits,
+                decoder_attentions=decoder_attentions,
+                cross_attentions=cross_attentions,
+                decoder_hidden_states=decoder_hidden_states,
             )
+            new_state = self.on_each_iteration_end(cur_state, streamer)
+            input_ids, model_kwargs, cur_len = new_state.autoregressive_props()
 
             # stop when each sentence is finished
             unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores)
@@ -778,22 +770,21 @@ class GenerationMixinWithPerIterCallbacks(GenerationMixin):
             if streamer is not None:
                 streamer.put(next_tokens.cpu())
             
-            input_ids, model_kwargs, cur_len = (
-                self.on_each_iteration_end(
-                    input_ids,
-                    next_tokens,
-                    next_token_logits,
-                    next_token_scores,
-                    cur_len,
-                    model_kwargs,
-                    scores,
-                    raw_logits,
-                    decoder_attentions,
-                    cross_attentions,
-                    decoder_hidden_states,
-                    streamer,
-                )
+            cur_state = GenerationState(
+                input_ids=input_ids,
+                model_kwargs=model_kwargs,
+                current_length=cur_len,
+                next_tokens=next_tokens,
+                next_token_logits=next_token_logits,
+                next_token_scores=next_token_scores,
+                scores=scores,
+                raw_logits=raw_logits,
+                decoder_attentions=decoder_attentions,
+                cross_attentions=cross_attentions,
+                decoder_hidden_states=decoder_hidden_states,
             )
+            new_state = self.on_each_iteration_end(cur_state, streamer)
+            input_ids, model_kwargs, cur_len = new_state.autoregressive_props()
             
             unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores)
             this_peer_finished = unfinished_sequences.max() == 0
@@ -1015,22 +1006,21 @@ class GenerationMixinWithPerIterCallbacks(GenerationMixin):
 
             input_ids = torch.cat([input_ids[beam_idx, :], beam_next_tokens.unsqueeze(-1)], dim=-1)
 
-            input_ids, model_kwargs, cur_len = (
-                self.on_each_iteration_end(
-                    input_ids,
-                    next_tokens,
-                    next_token_logits,
-                    next_token_scores,
-                    cur_len,
-                    model_kwargs,
-                    scores,
-                    raw_logits,
-                    decoder_attentions,
-                    cross_attentions,
-                    decoder_hidden_states,
-                    None,
-                )
+            cur_state = GenerationState(
+                input_ids=input_ids,
+                model_kwargs=model_kwargs,
+                current_length=cur_len,
+                next_tokens=next_tokens,
+                next_token_logits=next_token_logits,
+                next_token_scores=next_token_scores,
+                scores=scores,
+                raw_logits=raw_logits,
+                decoder_attentions=decoder_attentions,
+                cross_attentions=cross_attentions,
+                decoder_hidden_states=decoder_hidden_states,
             )
+            new_state = self.on_each_iteration_end(cur_state)
+            input_ids, model_kwargs, cur_len = new_state.autoregressive_props()
             
             # This is needed to properly delete outputs.logits which may be very large for first iteration
             # Otherwise a reference to outputs is kept which keeps the logits alive in the next iteration
@@ -1293,22 +1283,21 @@ class GenerationMixinWithPerIterCallbacks(GenerationMixin):
 
             input_ids = torch.cat([input_ids, current_tokens.unsqueeze(-1)], dim=-1)
             
-            input_ids, model_kwargs, cur_len = (
-                self.on_each_iteration_end(
-                    input_ids,
-                    next_tokens,
-                    next_token_logits,
-                    next_token_scores,
-                    cur_len,
-                    model_kwargs,
-                    scores,
-                    raw_logits,
-                    decoder_attentions,
-                    cross_attentions,
-                    decoder_hidden_states,
-                    None,
-                )
+            cur_state = GenerationState(
+                input_ids=input_ids,
+                model_kwargs=model_kwargs,
+                current_length=cur_len,
+                next_tokens=next_tokens,
+                next_token_logits=next_token_logits,
+                next_token_scores=next_token_scores,
+                scores=scores,
+                raw_logits=raw_logits,
+                decoder_attentions=decoder_attentions,
+                cross_attentions=cross_attentions,
+                decoder_hidden_states=decoder_hidden_states,
             )
+            new_state = self.on_each_iteration_end(cur_state)
+            input_ids, model_kwargs, cur_len = new_state.autoregressive_props()
             
             # This is needed to properly delete outputs.logits which may be very large for first iteration
             # Otherwise a reference to outputs is kept which keeps the logits alive in the next iteration
@@ -1515,22 +1504,21 @@ class GenerationMixinWithPerIterCallbacks(GenerationMixin):
 
             input_ids = torch.cat([input_ids[beam_idx, :], beam_next_tokens.unsqueeze(-1)], dim=-1)
             
-            input_ids, model_kwargs, cur_len = (
-                self.on_each_iteration_end(
-                    input_ids,
-                    next_tokens,
-                    next_token_logits,
-                    next_token_scores,
-                    cur_len,
-                    model_kwargs,
-                    scores,
-                    raw_logits,
-                    decoder_attentions,
-                    cross_attentions,
-                    decoder_hidden_states,
-                    None,
-                )
+            cur_state = GenerationState(
+                input_ids=input_ids,
+                model_kwargs=model_kwargs,
+                current_length=cur_len,
+                next_tokens=next_tokens,
+                next_token_logits=next_token_logits,
+                next_token_scores=next_token_scores,
+                scores=scores,
+                raw_logits=raw_logits,
+                decoder_attentions=decoder_attentions,
+                cross_attentions=cross_attentions,
+                decoder_hidden_states=decoder_hidden_states,
             )
+            new_state = self.on_each_iteration_end(cur_state)
+            input_ids, model_kwargs, cur_len = new_state.autoregressive_props()
             
             # This is needed to properly delete outputs.logits which may be very large for first iteration
             # Otherwise a reference to outputs is kept which keeps the logits alive in the next iteration
@@ -1785,22 +1773,21 @@ class GenerationMixinWithPerIterCallbacks(GenerationMixin):
                             decoder_hidden_states, outputs.hidden_states, cur_len, newly_added_length
                         )
 
-            input_ids, model_kwargs, cur_len = (
-                self.on_each_iteration_end(
-                    input_ids,
-                    valid_tokens,
-                    next_token_logits,
-                    tuple(new_logits[:, i, :] for i in range(n_matches + 1)),
-                    cur_len,
-                    model_kwargs,
-                    scores,
-                    raw_logits,
-                    decoder_attentions,
-                    cross_attentions,
-                    decoder_hidden_states,
-                    streamer,
-                )
+            cur_state = GenerationState(
+                input_ids=input_ids,
+                model_kwargs=model_kwargs,
+                current_length=cur_len,
+                next_tokens=valid_tokens,
+                next_token_logits=next_token_logits,
+                next_token_scores=tuple(new_logits[:, i, :] for i in range(n_matches + 1)),
+                scores=scores,
+                raw_logits=raw_logits,
+                decoder_attentions=decoder_attentions,
+                cross_attentions=cross_attentions,
+                decoder_hidden_states=decoder_hidden_states,
             )
+            new_state = self.on_each_iteration_end(cur_state, streamer)
+            input_ids, model_kwargs, cur_len = new_state.autoregressive_props()
             
             unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores)
             this_peer_finished = unfinished_sequences.max() == 0
@@ -1840,3 +1827,7 @@ class GenerationMixinWithPerIterCallbacks(GenerationMixin):
                 )
         else:
             return input_ids
+
+    def generate(self, inputs = None, generation_config = None, logits_processor = None, stopping_criteria = None, prefix_allowed_tokens_fn = None, synced_gpus = None, assistant_model = None, streamer = None, negative_prompt_ids = None, negative_prompt_attention_mask = None, **kwargs):
+        self._reset_before_generation()
+        return GenerationMixin.generate(self, inputs, generation_config, logits_processor, stopping_criteria, prefix_allowed_tokens_fn, synced_gpus, assistant_model, streamer, negative_prompt_ids, negative_prompt_attention_mask, **kwargs)
